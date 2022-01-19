@@ -66,6 +66,11 @@ if (NOT DEFINED BUILD_LIBRARY_ONLY)
 endif()
 
 if (NOT TARGET protobuf::libprotobuf)
+  set(Protobuf_PREFIX_PATH
+    "/root/miniconda3/envs/objdet/include"            
+    "/root/miniconda3/envs/objdet/lib"             
+    "/root/miniconda3/envs/objdet/bin" )
+  list(APPEND CMAKE_PREFIX_PATH "${Protobuf_PREFIX_PATH}")
   FIND_PACKAGE(Protobuf REQUIRED)
 else()
   set(PROTOBUF_LIB "protobuf::libprotobuf")

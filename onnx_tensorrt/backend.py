@@ -9,6 +9,7 @@ from onnx import helper as onnx_helper
 from onnx import numpy_helper
 import numpy as np
 import six
+import os
 
 # HACK Should look for a better way/place to do this
 from ctypes import cdll, c_char_p
@@ -31,8 +32,7 @@ def count_trailing_ones(vals):
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 class TensorRTBackendRep(BackendRep):
-    def __init__(self, model, device,
-            max_workspace_size=None, serialize_engine=False, verbose=False, **kwargs):
+    def __init__(self, model, device, max_workspace_size=None, serialize_engine=False, verbose=False, using_fp16=False, engine_file_path=None, **kwargs):
         if not isinstance(device, Device):
             device = Device(device)
         self._set_device(device)
@@ -45,6 +45,8 @@ class TensorRTBackendRep(BackendRep):
         self.serialize_engine = serialize_engine
         self.verbose = verbose
         self.dynamic = False
+        self.using_fp16 = using_fp16
+        self.engine_file_path = engine_file_path
 
         if self.verbose:
             print(f'\nRunning {model.graph.name}...')
@@ -71,6 +73,10 @@ class TensorRTBackendRep(BackendRep):
 
         self.config.max_workspace_size = max_workspace_size
 
+        if using_fp16:
+            print("USING FP16")
+            self.config.set_flag(trt.BuilderFlag.FP16)
+
         num_inputs = self.network.num_inputs
         for idx in range(num_inputs):
             inp_tensor = self.network.get_input(idx)
@@ -87,6 +93,10 @@ class TensorRTBackendRep(BackendRep):
         if self.dynamic:
             if self.verbose:
                 print("Found dynamic inputs! Deferring engine build to run stage")
+        elif self.serialize_engine:
+            if engine_file_path is not None:
+                trt_engine = self._deserialize(engine_file_path)
+                self.engine = Engine(trt_engine)
         else:
             self._build_engine()
         self._output_shapes = {}
@@ -136,6 +146,15 @@ class TensorRTBackendRep(BackendRep):
         self.device = device
         assert(device.type == DeviceType.CUDA)
         cudaSetDevice(device.device_id)
+
+    def _deserialize(self, engine_file_path):
+        print('USING SERIALIZED ENGINE')
+        if os.path.exists(engine_file_path):
+        # If a serialized engine exists, use it instead of building an engine.
+            print("Reading engine from file {}".format(engine_file_path))
+            with open(engine_file_path, "rb") as f, trt.Runtime(TRT_LOGGER) as runtime:
+                trt_engine = runtime.deserialize_cuda_engine(f.read())
+                return trt_engine
 
     def _serialize_deserialize(self, trt_engine):
         self.runtime = trt.Runtime(TRT_LOGGER)
