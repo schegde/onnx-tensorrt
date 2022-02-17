@@ -32,7 +32,7 @@ def count_trailing_ones(vals):
 TRT_LOGGER = trt.Logger(trt.Logger.WARNING)
 
 class TensorRTBackendRep(BackendRep):
-    def __init__(self, model, device, max_workspace_size=None, serialize_engine=False, verbose=False, using_fp16=False, engine_file_path=None, **kwargs):
+    def __init__(self, model, device, max_workspace_size=None, serialize_engine=False, verbose=False, using_fp16=False, using_int8=False, engine_file_path=None, **kwargs):
         if not isinstance(device, Device):
             device = Device(device)
         self._set_device(device)
@@ -76,6 +76,10 @@ class TensorRTBackendRep(BackendRep):
         if using_fp16:
             print("USING FP16")
             self.config.set_flag(trt.BuilderFlag.FP16)
+
+        if using_int8:
+            print("USING INT8")
+            self.config.set_flag(trt.BuilderFlag.INT8)
 
         num_inputs = self.network.num_inputs
         for idx in range(num_inputs):
